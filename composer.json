@@ -8,8 +8,8 @@
 			"email": "gabriele.brosulo@zirak.it"
 		}],
 	"require": {
-		"silverstripe/framework": "3.1.*",
-		"silverstripe/cms": "3.1.*"
+		"silverstripe/framework": "^3.1",
+		"silverstripe/cms": "^3.1"
 	},
 	"suggest": {
     "silverstripe/widgets": "Allows having mailchimp subscription inside widgets",
