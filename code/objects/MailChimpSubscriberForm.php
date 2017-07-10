@@ -5,9 +5,12 @@ use Mailchimp\MailchimpLists;
 /**
  * Class MailChimpSubscriberForm
  *
+ * @property string $Title
  * @property string $ListID
  * @property string $FieldsToShow
  * @property string $InterestCategoriesToShow
+ * @property string $Success
+ * @property string $Error
  */
 class MailChimpSubscriberForm extends DataObject implements PermissionProvider
 {
@@ -210,7 +213,9 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
         return $mailChimp->getInterests($this->ListID, $interestCategoryID);
     }
 
-
+    /**
+     * @return array
+     */
     public function getMergeFormFields()
     {
         $remoteFields = $this->getMergeFields();

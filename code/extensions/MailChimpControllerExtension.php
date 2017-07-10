@@ -1,8 +1,14 @@
 <?php
 
+/**
+ * Class MailChimpControllerExtension
+ */
 class MailChimpControllerExtension extends Extension
 {
 
+    /**
+     * @var array
+     */
     private static $allowed_actions = [
         'McSubscribeForm',
         'success',
