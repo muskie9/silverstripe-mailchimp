@@ -1,26 +1,13 @@
 <?php
 
-use MailChimp\MailchimpLists;
-
 class MailChimpControllerExtension extends Extension
 {
 
-    private static $allowed_actions = array('McSubscribeForm');
-
-    /*
-     * Redirect after registration
-     */
-    private static $redirect = true;
-
-    /*
-     * URL to redirect after a succesful registration
-     */
-    private static $redirect_ok = 'reg-ok';
-
-    /*
-     * URL to redirect after a failing registration
-     */
-    private static $redirect_ko = 'reg-ko';
+    private static $allowed_actions = [
+        'McSubscribeForm',
+        'success',
+        'error',
+    ];
 
     /**
      * Create the subscription form
@@ -29,7 +16,7 @@ class MailChimpControllerExtension extends Extension
      */
     public function McSubscribeForm()
     {
-        if ( ! $this->owner->data()->MailChimpFormID > 0 || !MailChimpSubscriberForm::get()->byID($this->owner->data()->MailChimpFormID)) {
+        if ( ! $this->owner->data()->MailChimpFormID > 0 || ! MailChimpSubscriberForm::get()->byID($this->owner->data()->MailChimpFormID)) {
             return false;
         }
         $listID = $this->owner->data()->MailChimpForm()->ListID;
@@ -68,10 +55,10 @@ class MailChimpControllerExtension extends Extension
     /**
      * Process the form
      *
-     * @param type $data
-     * @param type $form
+     * @param $data
+     * @param Form $form
      *
-     * @return type
+     * @return bool
      */
     public function McDoSubscribeForm($data, Form $form)
     {
@@ -96,29 +83,16 @@ class MailChimpControllerExtension extends Extension
         $interests = [];
 
         foreach ($dataClone['Category'] as $interest => $subInterests) {
-            foreach($subInterests as $interest){
-                $interests[$interest] = true;
-            }
-        }
-
-        $regOk = $this->mailChimpSubscribe($email, $mergeFields, $interests);
-        if ($regOk) {
-
-            // Pulisco la sessione 
-            Session::clear('MAILCHIMP_ERRCODE');
-            Session::clear('MAILCHIMP_ERRMSG');
-
-            if (Config::inst()->get('MailChimpController', 'redirect')) {
-                // Redireziono alla pagina di avvenuta registrazione
-                return $this->redirect(Config::inst()->get('MailChimpController', 'redirect_ok'));
+            if (is_array($subInterests)) {
+                foreach ($subInterests as $interest) {
+                    $interests[$interest] = true;
+                }
             } else {
-                // Se non è definita una pagina di redirezione, rimando indietro
-                return $this->redirectBack();
+                $interests[$subInterests] = true;
             }
-        } else {
-            // Pagina di errore
-            return $this->redirect(Config::inst()->get('MailChimpController', 'redirect_ko'));
         }
+
+        return $this->mailChimpSubscribe($email, $mergeFields, $interests);
     }
 
     /**
@@ -133,29 +107,41 @@ class MailChimpControllerExtension extends Extension
     protected function mailChimpSubscribe($email, $mergeFields = [], $interests = [])
     {
 
-        $form = $this->owner->data()->MailChimpForm();
-        $parameters = array_merge(['email_address' => $email, 'status' => 'subscribed'], $mergeFields, $interests);
-        //$retVal = $api->addMember(Config::inst()->get('MailChimpController', 'listid'), $email, $merge_vars);
+        $form       = $this->owner->data()->MailChimpForm();
+        $parameters = array_merge(['status' => 'subscribed'], ['merge_fields' => $mergeFields],
+            ['interests' => $interests]);
 
-        // Pulisco la sessione 
-        Session::clear('MAILCHIMP_ERRCODE');
-        Session::clear('MAILCHIMP_ERRMSG');
+        $response = $form->subscribe($email, $parameters);
 
-        // Gestione errori
-        if ($api->errorCode) {
-            // Errori in sessione
-            Session::set('MAILCHIMP_ERRCODE', $api->errorCode);
-            Session::set('MAILCHIMP_ERRMSG', $api->errorMessage);
-            trigger_error("Error subscribing: email [$email] code [$api->errorCode] msg[$api->errorMessage]",
-                E_USER_WARNING);
+        if (is_object($response) && property_exists($response, 'id')) {
+            return $this->owner->redirect($this->owner->Link('success'));
+        } else {
+            return $this->owner->redirect($this->owner->Link('error'));
         }
-
-        return $retVal;
     }
 
-    protected function getListTopics()
+    /**
+     * @return mixed
+     */
+    public function success()
     {
+        return $this->owner->customise([
+            'Title'           => $this->owner->data()->Title,
+            'Content'         => $this->owner->data()->MailChimpForm()->Success,
+            'McSubscribeForm' => false,
+        ]);
+    }
 
+    /**
+     * @return mixed
+     */
+    public function error()
+    {
+        return $this->owner->customise([
+            'Title'           => $this->owner->data()->Title,
+            'Content'         => $this->owner->data()->MailChimpForm()->Error,
+            'McSubscribeForm' => false,
+        ]);
     }
 
 }

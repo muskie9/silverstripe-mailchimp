@@ -20,6 +20,8 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
         'ListID'                   => 'Varchar(255)',
         'FieldsToShow'             => 'Text',
         'InterestCategoriesToShow' => 'Text',
+        'Success'                  => 'HTMLText',
+        'Error'                    => 'HTMLText',
     ];
 
     /**
@@ -35,6 +37,8 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
     private static $field_type_map = [
         'text'       => 'TextField',
         'checkboxes' => 'CheckboxSetField',
+        'radio'      => 'OptionsetField',
+        'dropdown'   => 'DropdownField',
     ];
 
     /**
@@ -44,7 +48,7 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
     {
         $fields = parent::getCMSFields();
 
-        $remove  = [
+        $remove = [
             'FieldsToShow',
             'InterestCategoriesToShow',
         ];
@@ -55,6 +59,16 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
             'Root.Main',
             TextField::create('Title')
                 ->setTitle('Title')
+        );
+
+        $fields->addFieldsToTab(
+            'Root.PostSignupMessages',
+            [
+                HtmlEditorField::create('Success')
+                    ->setTitle('Success Message'),
+                HtmlEditorField::create('Error')
+                    ->setTitle('Error Message'),
+            ]
         );
 
         $lists = [];
@@ -95,7 +109,9 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
                 $categoryOptions = [];
 
                 $pushCategoryOption = function ($category) use (&$categoryOptions) {
-                    $categoryOptions[$category->id] = $category->title;
+                    if ($category->type != 'hidden') {
+                        $categoryOptions[$category->id] = $category->title;
+                    }
                 };
 
                 foreach ($interestCategories as $category) {
@@ -107,6 +123,7 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
                         ->setTitle('Groups To Show')
                         ->setSource($categoryOptions)
                 );
+
             }
 
         }
@@ -249,8 +266,11 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
                 $interests = $this->getInterests($field->id);
                 $fieldType = $fieldTypeMap[$field->type];
                 $field     = $fieldType::create("Category[{$field->id}]")->setTitle($field->title);
-                if ($field instanceof CheckboxSetField) {
+                if ($field instanceof DropdownField) {
                     $field->setSource($this->getInterestArray($interests));
+                    if ($field->hasMethod('setEmptyString')) {
+                        $field->setEmptyString("Select {$field->title}");
+                    }
                 }
             }
 
@@ -280,6 +300,17 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
         }
 
         return $interestsArray;
+    }
+
+    /**
+     * @param $email
+     * @param $parameters
+     *
+     * @return mixed
+     */
+    public function subscribe($email, $parameters)
+    {
+        return $this->getMailChimp()->addMember($this->ListID, $email, $parameters);
     }
 
     /**
@@ -333,7 +364,7 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
             $member = Member::currentUser();
         }
 
-        return Permission::check('MailChimp_delete', 'any', $member);
+        return Permission::check('MailChimp_delete', 'any', $member) && ! $this->inUse();
     }
 
     /**
@@ -344,6 +375,14 @@ class MailChimpSubscriberForm extends DataObject implements PermissionProvider
     public function canView($member = null)
     {
         return true;
+    }
+
+    /**
+     * @return bool
+     */
+    protected function inUse()
+    {
+        return $this->MailChimpPages()->count() > 0;
     }
 
 }
